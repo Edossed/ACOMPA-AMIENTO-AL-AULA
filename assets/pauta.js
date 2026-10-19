@@ -3,7 +3,7 @@
   const { esc } = U;
   const $ = id => document.getElementById(id);
 
-  const K = { obs: "pauta.obs", actual: "pauta.actual", cola: "pauta.cola", nomina: "pauta.nomina", codigo: "pauta.codigo", observador: "pauta.observador", compacto: "pauta.compacto" };
+  const K = { obs: "pauta.obs", actual: "pauta.actual", cola: "pauta.cola", nomina: "pauta.nomina", codigo: "pauta.codigo", observador: "pauta.observador", compacto: "pauta.compacto", equipo: "pauta.equipo" };
   const CAMPOS = ["docente", "coDocente", "curso", "asignatura", "fecha", "horaInicio", "horaFin", "observador", "objetivo", "herramientasIA"];
   const RETRO = ["fortalezas", "mejoras", "sugerencias", "general", "acuerdos", "fechaRetro", "fechaSeguimiento"];
 
@@ -70,8 +70,11 @@
   }
 
   function llenarSelects() {
-    const grupos = [...new Set(nomina.map(n => n.grupo))];
-    const opts = grupos.map(g => `<optgroup label="${esc(g)}">${nomina.filter(n => n.grupo === g).map(n => `<option value="${esc(n.nombre)}">${esc(n.nombre)}${n.rol ? " · " + esc(n.rol) : ""}</option>`).join("")}</optgroup>`).join("");
+    const activos = nomina.filter(n => !A.enStandBy(n)), pausa = nomina.filter(A.enStandBy);
+    const opt = n => `<option value="${esc(n.nombre)}">${esc(n.nombre)}${n.rol ? " · " + esc(n.rol) : ""}</option>`;
+    const grupos = [...new Set(activos.map(n => n.grupo))];
+    const opts = grupos.map(g => `<optgroup label="${esc(g)}">${activos.filter(n => n.grupo === g).map(opt).join("")}</optgroup>`).join("")
+      + (pausa.length ? `<optgroup label="En stand by (sin acompañamiento)">${pausa.map(opt).join("")}</optgroup>` : "");
     $("docente").innerHTML = `<option value="">Seleccione…</option>` + opts;
     $("coDocente").innerHTML = `<option value="">—</option>` + opts;
   }
@@ -260,22 +263,86 @@
     A.toast(`Copia creada para ${copia.docente}. Revise los niveles y comentarios individuales.`);
   }
 
-  function misObservaciones() {
-    const lista = Object.values(todas()).sort((a, b) => (b.actualizado || "").localeCompare(a.actualizado || ""));
-    const filas = lista.map(o => {
+  // Observaciones del equipo: las guardadas en Drive por todos + los borradores de este computador
+  async function cargarEquipo() {
+    let servidor = A.store.get(K.equipo, []), enLinea = false;
+    if (A.conectado() && navigator.onLine) {
+      try {
+        const r = await A.api("listar", { codigo: A.store.get(K.codigo, "") });
+        servidor = r.observaciones || []; A.store.set(K.equipo, servidor); enLinea = true;
+      } catch (e) { }
+    }
+    const mapa = {};
+    servidor.forEach(o => { mapa[o.id] = { ...o, estado: "guardado" }; });
+    Object.values(todas()).forEach(o => {
+      const s = mapa[o.id];
+      // Se prefiere la versión local solo si tiene cambios aún no enviados
+      if (!s || (o.estado !== "guardado" && (o.actualizado || "") >= (s.actualizado || ""))) mapa[o.id] = o;
+    });
+    return { mapa, enLinea };
+  }
+
+  // Eliminar una pauta guardada en Drive (repetida o por error). Requiere la clave UTP, que se verifica en el servidor.
+  function eliminarDeDrive(o, alTerminar) {
+    const m = A.modal(`<h2>Eliminar observación</h2>
+      <p>Se eliminará la pauta de <b>${esc(o.docente)}</b> (${esc(o.curso)} · ${esc(A.fechaLarga(o.fecha))}), registrada por ${esc(o.observador || "—")}.</p>
+      <p class="small muted">Desaparecerá de la lista del equipo y del Área UTP. Queda un respaldo en la hoja «Eliminadas» de la planilla y el PDF pasa a la papelera de Drive.</p>
+      <label class="f">Clave UTP<input id="eClave" type="password" autocomplete="off"></label>
+      <p class="small" id="eErr" style="color:var(--danger)"></p>
+      <div class="actions"><button class="btn" data-close>Cancelar</button><button class="btn primary" id="eOk" style="background:var(--danger);border-color:var(--danger)">Eliminar</button></div>`);
+    const ok = async () => {
+      const clave = m.el.querySelector("#eClave").value.trim(); if (!clave) return;
+      const b = m.el.querySelector("#eOk"); b.disabled = true; b.textContent = "Eliminando…";
+      try {
+        await A.api("eliminar", { clave, id: o.id });
+        const all = todas(); delete all[o.id]; A.store.set(K.obs, all);
+        A.store.set(K.equipo, A.store.get(K.equipo, []).filter(x => x.id !== o.id));
+        A.store.set(K.cola, A.store.get(K.cola, []).filter(x => x !== o.id));
+        if (obs.id === o.id) nuevaObs();
+        m.close(); A.toast("Observación eliminada."); alTerminar && alTerminar();
+      } catch (e) {
+        m.el.querySelector("#eErr").textContent = e.message; b.disabled = false; b.textContent = "Eliminar";
+      }
+    };
+    m.el.querySelector("#eOk").onclick = ok;
+    m.el.querySelector("#eClave").addEventListener("keydown", e => { if (e.key === "Enter") ok(); });
+    setTimeout(() => m.el.querySelector("#eClave").focus(), 50);
+  }
+
+  async function misObservaciones() {
+    const m = A.modal(`<h2>Observaciones del equipo</h2><p class="muted">Cargando desde Drive…</p>`);
+    const { mapa, enLinea } = await cargarEquipo();
+    const lista = Object.values(mapa).filter(o => o.docente || o.estado !== "guardado")
+      .sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "") || (b.actualizado || "").localeCompare(a.actualizado || ""));
+    const fila = o => {
       const marcados = U.indicadores.filter(i => o.niveles[i.id] != null).length;
-      const b = o.estado === "guardado" ? `<span class="badge ok">En Drive</span>` : o.estado === "pendiente" ? `<span class="badge warn">Pendiente</span>` : `<span class="badge">Borrador</span>`;
-      return `<tr><td><b>${esc(o.docente || "(sin docente)")}</b><br><span class="small muted">${esc(o.curso)} · ${esc(o.fecha)}</span></td><td>${marcados}/${U.indicadores.length}</td><td>${b}${o.pdfUrl ? `<br><a class="small" href="${esc(o.pdfUrl)}" target="_blank" rel="noopener">PDF</a>` : ""}</td>
-        <td class="actions"><button class="btn small" data-abrir="${o.id}">Abrir</button><button class="btn small" data-imp="${o.id}">Imprimir</button>${o.estado !== "guardado" ? `<button class="btn small ghost" data-del="${o.id}" title="Eliminar de este equipo">Eliminar</button>` : ""}</td></tr>`;
-    }).join("");
-    const m = A.modal(`<h2>Mis observaciones (este equipo)</h2>
-      ${lista.length ? `<table class="list"><thead><tr><th>Docente</th><th>Avance</th><th>Estado</th><th></th></tr></thead><tbody>${filas}</tbody></table>` : `<p class="muted">Aún no hay observaciones.</p>`}
-      <div class="actions"><button class="btn" data-close>Cerrar</button></div>`);
+      const b = o.estado === "guardado" ? `<span class="badge ok">En Drive</span>` : o.estado === "pendiente" ? `<span class="badge warn">Pendiente (este equipo)</span>` : `<span class="badge">Borrador (este equipo)</span>`;
+      const buscar = [o.docente, o.observador, o.curso, o.grupo, o.fecha].join(" ").toLowerCase();
+      return `<tr data-buscar="${esc(buscar)}"><td><b>${esc(o.docente || "(sin docente)")}</b><br><span class="small muted">${esc(o.curso)} · ${esc(o.fecha)}</span></td><td class="small">${esc(o.observador || "—")}</td><td>${marcados}/${U.indicadores.length}</td><td>${b}${o.pdfUrl ? `<br><a class="small" href="${esc(o.pdfUrl)}" target="_blank" rel="noopener">PDF</a>` : ""}</td>
+        <td class="actions"><button class="btn small" data-abrir="${o.id}">Abrir</button><button class="btn small" data-imp="${o.id}">Imprimir</button>${o.estado !== "guardado" ? `<button class="btn small ghost" data-del="${o.id}" title="Eliminar de este computador">Eliminar</button>` : `<button class="btn small ghost" data-elim="${o.id}" title="Eliminar de Drive (requiere clave UTP)" style="color:var(--danger)">Eliminar</button>`}</td></tr>`;
+    };
+    m.el.querySelector(".modal").style.maxWidth = "860px";
+    m.el.querySelector(".modal").innerHTML = `<h2>Observaciones del equipo (${lista.length})</h2>
+      <p class="small muted" style="margin-top:-4px">${enLinea ? "Incluye las pautas guardadas en Drive por todo el equipo y los borradores de este computador." : A.conectado() ? "Sin conexión con Drive: se muestra la última lista descargada y los borradores de este computador." : "Modo local: solo observaciones de este computador."}</p>
+      <input id="mBuscar" placeholder="Buscar por docente, observador/a, curso o grupo" style="margin-bottom:8px">
+      ${lista.length ? `<table class="list"><thead><tr><th>Docente</th><th>Observador/a</th><th>Avance</th><th>Estado</th><th></th></tr></thead><tbody>${lista.map(fila).join("")}</tbody></table>` : `<p class="muted">Aún no hay observaciones.</p>`}
+      <div class="actions"><button class="btn" data-close>Cerrar</button></div>`;
+    m.el.querySelector("[data-close]").onclick = m.close;
+    m.el.querySelector("#mBuscar").addEventListener("input", e => {
+      const q = e.target.value.toLowerCase().trim();
+      m.el.querySelectorAll("tr[data-buscar]").forEach(tr => { tr.style.display = !q || tr.dataset.buscar.includes(q) ? "" : "none"; });
+    });
     m.el.addEventListener("click", e => {
       const t = e.target;
-      if (t.dataset.abrir) { abrir(t.dataset.abrir); m.close(); }
-      if (t.dataset.imp) A.imprimirHTML(A.informeHTML(todas()[t.dataset.imp]));
-      if (t.dataset.del && confirm("¿Eliminar este borrador de este equipo? No se puede deshacer.")) {
+      if (t.dataset.abrir) {
+        const o = mapa[t.dataset.abrir], all = todas();
+        if (!all[o.id] || all[o.id].estado === "guardado") { all[o.id] = o; A.store.set(K.obs, all); }
+        abrir(o.id); m.close();
+        if (o.observador && o.observador !== A.store.get(K.observador, "")) A.toast(`Pauta de ${o.observador}. Si la modifica y guarda, se actualiza para todo el equipo.`, 4500);
+      }
+      if (t.dataset.imp) A.imprimirHTML(A.informeHTML(mapa[t.dataset.imp]));
+      if (t.dataset.elim) eliminarDeDrive(mapa[t.dataset.elim], () => { m.close(); misObservaciones(); });
+      if (t.dataset.del && confirm("¿Eliminar este borrador de este computador? No se puede deshacer.")) {
         const all = todas(); delete all[t.dataset.del]; A.store.set(K.obs, all);
         A.store.set(K.cola, A.store.get(K.cola, []).filter(x => x !== t.dataset.del));
         m.close(); if (obs.id === t.dataset.del) nuevaObs(); misObservaciones();
@@ -305,7 +372,7 @@
     $("btnVista").onclick = vistaPrevia;
     $("btnImprimir").onclick = imprimir;
     $("btnGuardar").onclick = guardar;
-    $("btnNueva").onclick = () => { if (confirm("¿Iniciar una nueva observación? La actual queda en 'Mis observaciones'.")) nuevaObs(); };
+    $("btnNueva").onclick = () => { if (confirm("¿Iniciar una nueva observación? La actual queda en 'Observaciones del equipo'.")) nuevaObs(); };
     $("btnMis").onclick = misObservaciones;
     $("btnDuplicar").onclick = duplicar;
     window.addEventListener("online", () => { estadoConexion(); procesarCola(); });

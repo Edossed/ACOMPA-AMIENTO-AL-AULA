@@ -94,7 +94,9 @@
     const g = $("fGrupo").value, d = $("fDesde").value, h = $("fHasta").value, ob = $("fObs").value;
     return datos.observaciones.filter(o => (!g || o.grupo === g) && (!d || o.fecha >= d) && (!h || o.fecha <= h) && (!ob || o.observador === ob));
   }
-  function nominaFiltrada() { const g = $("fGrupo").value; return datos.nomina.filter(n => !g || n.grupo === g); }
+  // Nómina activa: excluye a quienes están en stand by (no requieren acompañamiento)
+  function nominaFiltrada() { const g = $("fGrupo").value; return datos.nomina.filter(n => (!g || n.grupo === g) && !A.enStandBy(n)); }
+  function standBy() { const g = $("fGrupo").value; return datos.nomina.filter(n => (!g || n.grupo === g) && A.enStandBy(n)); }
 
   /* ---------- Cálculos ---------- */
   function statsIndicador(obs, id) {
@@ -206,7 +208,9 @@
     return `<section class="card"><div class="card-head"><h2>Mapa de docentes por indicador</h2><span class="avg small">Clic en un nombre para ver su informe individual</span></div>
       ${leyenda}<div class="heat-wrap"><table class="heat"><thead>${head}</thead><tbody>${filas || `<tr><td class="muted">Sin observaciones</td></tr>`}</tbody></table></div></section>
       <section class="card"><h2>Pendientes de observar (${pendientes.length})</h2>
-      ${pendientes.length ? `<table class="list"><thead><tr><th>Docente</th><th>Grupo CPA</th><th>Curso</th></tr></thead><tbody>${pendientes.map(n => `<tr><td>${esc(n.nombre)}</td><td>${esc(n.grupo)}</td><td>${esc(n.curso)}</td></tr>`).join("")}</tbody></table>` : `<p class="muted">Toda la nómina tiene al menos una observación.</p>`}</section>`;
+      ${pendientes.length ? `<table class="list"><thead><tr><th>Docente</th><th>Grupo CPA</th><th>Curso</th></tr></thead><tbody>${pendientes.map(n => `<tr><td>${esc(n.nombre)}</td><td>${esc(n.grupo)}</td><td>${esc(n.curso)}</td></tr>`).join("")}</tbody></table>` : `<p class="muted">Toda la nómina tiene al menos una observación.</p>`}</section>
+      ${standBy().length ? `<section class="card"><h2>En stand by (${standBy().length})</h2><p class="small muted" style="margin-top:-6px">No requieren acompañamiento este período. No se cuentan en la cobertura ni en los pendientes.</p>
+      <table class="list"><thead><tr><th>Docente</th><th>Grupo CPA</th><th>Rol</th></tr></thead><tbody>${standBy().map(n => `<tr><td>${esc(n.nombre)}</td><td>${esc(n.grupo)}</td><td>${esc(n.rol)}</td></tr>`).join("")}</tbody></table></section>` : ""}`;
   }
 
   function vGrupos(obs) {
@@ -299,6 +303,7 @@
       <p class="note">Criterio: promedio de la Dimensión IA igual o mayor a 3,5.</p>
       ${referentes.length ? `<ul>${referentes.map(d => `<li><b>${esc(d.nombre)}</b> (${esc(d.grupo)}) · Dimensión IA ${fmt(d.dims.D4)}</li>`).join("")}</ul>` : "<p>Aún no hay docentes en esta condición.</p>"}
       ${pendientes.length ? `<h3>Docentes pendientes de observar (${pendientes.length})</h3><p>${pendientes.map(n => esc(n.nombre)).join(", ")}</p>` : ""}
+      ${standBy().length ? `<h3>Docentes en stand by (${standBy().length})</h3><p class="note">No requieren acompañamiento este período; no se consideran en la cobertura.</p><p>${standBy().map(n => esc(n.nombre)).join(", ")}</p>` : ""}
       <div class="firma"><div>Jefatura Unidad Técnico Pedagógica</div></div>
     </body></html>`;
   }

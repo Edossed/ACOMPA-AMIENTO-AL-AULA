@@ -179,5 +179,8 @@ ${obs.retro.general ? `<div class="box"><b>Comentario general</b>${nl(obs.retro.
     return { el: bg, close };
   }
 
-  return { store, api, conectado, uid, fechaLarga, generarRetro, informeHTML, imprimirHTML, toast, modal };
+  // Docentes en "stand by": se marcan escribiendo "Stand by" en la columna Rol de la hoja Nomina
+  const enStandBy = n => /stand\s*-?\s*by/i.test((n && n.rol) || "");
+
+  return { store, api, conectado, uid, enStandBy, fechaLarga, generarRetro, informeHTML, imprimirHTML, toast, modal };
 })();
