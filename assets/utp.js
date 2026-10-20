@@ -182,7 +182,7 @@
   }
 
   function vIndicadores(obs) {
-    return R.dimensiones.map(d => `<section class="card"><div class="card-head"><h2>${esc(d.nombre)}</h2><span class="src">${esc(d.fuente)}</span><span class="avg">Promedio ${fmt(promDim(obs, d.id))}</span></div>
+    return R.dimensiones.map(d => `<section class="card"><div class="card-head"><h2>${esc(d.nombre)}</h2><span class="avg">Promedio ${fmt(promDim(obs, d.id))}</span></div>
       ${leyenda}
       ${d.sub.map(s => `<div class="sub-title">${s.id} ${esc(s.nombre)}</div>` + s.ind.map(i => apilada(`<span class="code">${i.id}</span>${esc(i.nombre)}`, statsIndicador(obs, i.id), `${i.id} ${esc(i.nombre)}`)).join("")).join("")}
     </section>`).join("") + vUsosIA(obs);
@@ -257,7 +257,7 @@
   }
   function cabecera(titulo) {
     return `<div class="conf">CONFIDENCIAL · USO EXCLUSIVO UTP</div><h1>${titulo}</h1>
-      <div class="sub">${esc(C.COLEGIO)} · Acompañamiento de aula ${C.ANIO} · Enfoque Docente + Innovación pedagógica (IA)<br>${esc(filtroTxt())} · Emitido el ${new Date().toLocaleDateString("es-CL", { day: "numeric", month: "long", year: "numeric" })}</div>`;
+      <div class="sub">${esc(C.COLEGIO)} · Acompañamiento de aula ${C.ANIO} · Innovación Pedagógica<br>${esc(filtroTxt())} · Emitido el ${new Date().toLocaleDateString("es-CL", { day: "numeric", month: "long", year: "numeric" })}</div>`;
   }
 
   function informeInstitucional(obs) {

@@ -81,11 +81,13 @@
 
   /* ---------- Render de la rúbrica ---------- */
   function renderRubrica() {
-    $("rubrica").innerHTML = R.dimensiones.map((d, di) => `
+    const criterios = `<section class="card criterios"><h2>Criterios para decidir el nivel</h2>
+      <p class="small muted" style="margin-top:-6px">Aplican a todos los indicadores. Cada indicador detalla además qué observar y el descriptor de cada nivel.</p>
+      <dl>${R.niveles.map(l => `<div><dt><span class="lv n${l.n}">${l.n}</span> ${esc(l.nombre)}</dt><dd>${esc(l.def)}</dd></div>`).join("")}</dl></section>`;
+    $("rubrica").innerHTML = criterios + R.dimensiones.map((d, di) => `
       <section class="card" data-dim="${d.id}">
         <div class="card-head">
           <h2>${di === 0 ? "2. " : ""}${d.id.replace("D", "Dimensión ")}: ${esc(d.nombre)}</h2>
-          <span class="src">${esc(d.fuente)}</span>
           <span class="avg" id="avg-${d.id}"></span>
         </div>
         ${d.sub.map(s => `
@@ -94,6 +96,7 @@
             <div class="ind" data-ind="${i.id}">
               <div class="ind-head"><span class="code">${i.id}</span><span class="name">${esc(i.nombre)}${i.evidencia ? '<span class="tag">revisar evidencia</span>' : ""}</span></div>
               <div class="ind-desc">${esc(i.desc)}</div>
+              <div class="ind-obs"><b>Qué observar:</b><ul>${i.observar.map(o => `<li>${esc(o)}</li>`).join("")}</ul></div>
               <div class="levels" role="group" aria-label="Nivel ${i.id}">
                 ${R.niveles.map(l => `<button type="button" class="lvl n${l.n}" data-n="${l.n}" aria-pressed="false"><b>${l.n} · ${l.nombre}</b><span>${esc(i.niveles[l.n - 1])}</span></button>`).join("")}
                 <button type="button" class="lvl n0" data-n="0" aria-pressed="false" title="No observado / no aplica"><b>N/O</b></button>
@@ -356,7 +359,7 @@
     const compacto = A.store.get(K.compacto, false);
     $("compacto").checked = compacto; document.body.classList.toggle("compact", compacto);
     $("compacto").onchange = () => { document.body.classList.toggle("compact", $("compacto").checked); A.store.set(K.compacto, $("compacto").checked); };
-    $("subtitulo").textContent = `${C.COLEGIO} · Enfoque Docente + Innovación pedagógica: Integración pedagógica de la IA`;
+    $("subtitulo").textContent = `${C.COLEGIO} · Innovación Pedagógica`;
 
     if (!A.conectado()) {
       $("avisoLocal").classList.remove("hidden");

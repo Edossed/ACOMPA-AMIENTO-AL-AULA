@@ -10,6 +10,16 @@ window.APP = (function () {
     del(k) { try { localStorage.removeItem(k); } catch (e) { } }
   };
 
+  let logoData = "";
+  (async function cargarLogo() {
+    if (!C.LOGO) return;
+    try {
+      const r = await fetch(C.LOGO); if (!r.ok) return;
+      const b = await r.blob();
+      logoData = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(b); });
+    } catch (e) { }
+  })();
+
   const conectado = () => !!(C.API_URL && C.API_URL.trim());
 
   // POST con text/plain para evitar preflight CORS en Apps Script.
@@ -61,20 +71,19 @@ window.APP = (function () {
   // Solo tablas y CSS simple, compatible con la conversión a PDF de Google.
   function informeHTML(obs) {
     const sel = (n, k) => n === k ? `<td class="x x${k}">${k === 0 ? "N/O" : "X"}</td>` : `<td class="x"></td>`;
-    // Resumen sin puntaje: cantidad de indicadores marcados en cada nivel
-    const cuenta = (d, k) => window.RUB.indicadores.filter(i => i.dim === d.id && obs.niveles[i.id] === k).length;
-    const dimsRows = R.dimensiones.map(d => `<tr><td>${esc(d.nombre)}</td>${[1, 2, 3, 4, 0].map(k => `<td class="c">${cuenta(d, k) || ""}</td>`).join("")}</tr>`).join("");
+    const nl0 = t => esc(t || "").replace(/\n/g, "<br>");
     const tablas = R.dimensiones.map(d => {
       const filas = d.sub.map(s => `<tr class="subrow"><td colspan="7">${s.id} ${esc(s.nombre)}</td></tr>` + s.ind.map(i => {
         const n = obs.niveles[i.id] ?? null;
-        return `<tr><td class="ind"><b>${i.id}</b> ${esc(i.nombre)}</td>${sel(n, 1)}${sel(n, 2)}${sel(n, 3)}${sel(n, 4)}${sel(n, 0)}<td class="com">${esc(obs.comentarios[i.id] || "")}</td></tr>`;
+        const com = (obs.comentarios[i.id] || "").trim();
+        const nivel = n >= 1 ? `<div class="nv"><b>${esc(nivelNombre(n))}:</b> ${esc(i.niveles[n - 1])}</div>` : n === 0 ? `<div class="nv"><b>No observado.</b></div>` : "";
+        return `<tr><td class="ind"><b>${i.id} ${esc(i.nombre)}</b><div class="desc">${esc(i.desc)}</div></td>${sel(n, 1)}${sel(n, 2)}${sel(n, 3)}${sel(n, 4)}${sel(n, 0)}<td class="com">${nivel}${com ? `<div class="ev"><b>Evidencia:</b> ${nl0(com)}</div>` : ""}</td></tr>`;
       }).join("")).join("");
-      return `<h3>${d.id.replace("D", "Dimensión ")}: ${esc(d.nombre)} <span class="src">(${esc(d.fuente)})</span></h3>
-      <table class="rub"><thead><tr><th style="width:30%">Indicador</th><th class="x">PD</th><th class="x">ED</th><th class="x">D</th><th class="x">DS</th><th class="x">N/O</th><th>Evidencias / comentarios</th></tr></thead><tbody>${filas}</tbody></table>`;
+      return `<h3>${d.id.replace("D", "Dimensión ")}: ${esc(d.nombre)}</h3>
+      <table class="rub"><thead><tr><th style="width:34%">Indicador</th><th class="x">PD</th><th class="x">ED</th><th class="x">D</th><th class="x">DS</th><th class="x">N/O</th><th>Nivel observado y evidencias</th></tr></thead><tbody>${filas}</tbody></table>`;
     }).join("");
+    const criterios = R.niveles.map(l => `<tr><td class="k">${l.corto} · ${esc(l.nombre)}</td><td>${esc(l.def)}</td></tr>`).join("");
     const nl = s => esc(s || "").replace(/\n/g, "<br>");
-    const ev = R.evidenciasIA.map(e => `<span class="ck">${(obs.evidenciasIA || []).includes(e) ? "[X]" : "[&nbsp;&nbsp;]"} ${esc(e)}</span>`).join(" ");
-    const usos = (obs.usosIA || []).join(", ") || "—";
     return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Pauta ${esc(obs.docente)} ${esc(obs.fecha)}</title>
 <style>
   @page { size: A4; margin: 14mm 12mm; }
@@ -91,12 +100,17 @@ window.APP = (function () {
   .datos td { border: 1px solid #bbb; }
   .datos .k { background: #f2f4f7; font-weight: bold; width: 16%; font-size: 8.5pt; }
   .c { text-align: center; }
-  .x { width: 6%; text-align: center; font-weight: bold; font-size: 8.5pt; }
+  .x { width: 5%; text-align: center; font-weight: bold; font-size: 8.5pt; }
+  .desc { font-size: 8pt; color: #444; margin-top: 2px; }
+  .nv { font-size: 8.5pt; }
+  .ev { font-size: 8.5pt; margin-top: 3px; }
+  .crit td { font-size: 8.5pt; }
+  .crit .k { width: 20%; }
+  .head .banner { width: 78mm; height: auto; display: block; margin-bottom: 8px; }
   .x1 { background: #f6cfcd; } .x2 { background: #fbe3dc; } .x3 { background: #dbe8f8; } .x4 { background: #b9d2f2; } .x0 { background: #eee; }
   .subrow td { background: #f2f4f7; font-weight: bold; font-size: 8.5pt; }
   .ind { font-size: 9pt; }
   .com { font-size: 8.5pt; color: #222; }
-  .ck { display: inline-block; margin-right: 12px; font-size: 9pt; }
   .box { border: 1px solid #999; padding: 6px 8px; min-height: 30px; margin-bottom: 6px; font-size: 9pt; }
   .box b { display: block; margin-bottom: 2px; }
   .lines div { border-bottom: 1px solid #999; height: 20px; }
@@ -108,9 +122,9 @@ window.APP = (function () {
   .nobreak { page-break-inside: avoid; }
 </style></head><body>
 <div class="head">
-  <div class="col">${esc(C.COLEGIO)} · Unidad Técnico Pedagógica · ${esc(String(C.ANIO))}</div>
-  <h1>Pauta de Observación y Retroalimentación de Aula</h1>
-  <div class="col">Enfoque Docente (Agencia de Calidad de la Educación) + Innovación pedagógica: Integración pedagógica de la IA</div>
+  ${logoData ? `<img class="banner" src="${logoData}" alt="${esc(C.COLEGIO)} · Unidad Técnica Pedagógica">` : `<div class="col">${esc(C.COLEGIO)} · Unidad Técnica Pedagógica</div>`}
+  <h1>Pauta de Observación y Retroalimentación de Aula – Innovación Pedagógica</h1>
+  <div class="col">Acompañamiento de aula ${esc(String(C.ANIO))}</div>
 </div>
 <table class="datos">
   <tr><td class="k">Docente</td><td>${esc(obs.docente)}${obs.coDocente ? " <span class='src'>(clase compartida con " + esc(obs.coDocente) + ")</span>" : ""}</td><td class="k">Grupo CPA</td><td>${esc(obs.grupo || "—")}</td></tr>
@@ -118,16 +132,11 @@ window.APP = (function () {
   <tr><td class="k">Fecha</td><td>${fechaLarga(obs.fecha)}</td><td class="k">Horario</td><td>${esc(obs.horaInicio || "")}${obs.horaFin ? " – " + esc(obs.horaFin) : ""}</td></tr>
   <tr><td class="k">Observador/a</td><td colspan="3">${esc(obs.observador)}</td></tr>
   <tr><td class="k">Objetivo de la clase</td><td colspan="3">${nl(obs.objetivo)}</td></tr>
-  <tr><td class="k">Herramientas de IA</td><td colspan="3">${esc(obs.herramientasIA || "—")} <span class="src">· Uso en: ${esc(usos)}</span></td></tr>
-  <tr><td class="k">Evidencias IA</td><td colspan="3">${ev}</td></tr>
 </table>
 
-<h2>Resumen por dimensión</h2>
-<table><thead><tr><th>Dimensión</th><th class="x">PD</th><th class="x">ED</th><th class="x">D</th><th class="x">DS</th><th class="x">N/O</th></tr></thead>
-<tbody>${dimsRows}</tbody></table>
-<div class="leyenda">Número de indicadores observados en cada nivel. PD = Por desarrollar · ED = En desarrollo · D = Desarrollado (referente satisfactorio) · DS = Destacado · N/O = No observado. La pauta no asigna puntaje.</div>
-
 <h2>Registro de observación</h2>
+<table class="datos crit">${criterios}</table>
+<div class="leyenda">Criterios para cada nivel. N/O = No observado durante la clase. La pauta no asigna puntaje.</div>
 ${tablas}
 
 <div class="nobreak">

@@ -132,13 +132,20 @@ textarea { resize: vertical; min-height: 64px; }
 .lvl[aria-pressed="true"] b { color: inherit; }
 .lvl.n0 { text-align: center; }
 .ind textarea { margin: 8px 0 0 48px; width: calc(100% - 48px); min-height: 40px; font-size: .88rem; }
+.ind-obs { font-size: .82rem; color: var(--ink-2); margin: 0 0 8px 48px; background: var(--surface-2); border-radius: 8px; padding: 6px 10px; }
+.ind-obs ul { margin: 2px 0 0; padding-left: 18px; }
+.ind-obs li { margin: 1px 0; }
+.criterios dl { margin: 0; display: grid; gap: 8px; }
+.criterios dt { font-weight: 650; font-size: .9rem; display: flex; align-items: center; gap: 8px; }
+.criterios dd { margin: 2px 0 0 38px; font-size: .86rem; color: var(--ink-2); }
 .compact .lvl span { display: none; }
+.compact .ind-obs { display: none; }
 .compact .lvl { min-height: 36px; }
 
 @media (max-width: 720px) {
   .levels { grid-template-columns: repeat(2, 1fr); margin-left: 0; }
   .levels .n0 { grid-column: 1 / -1; }
-  .ind-desc { margin-left: 0; }
+  .ind-desc, .ind-obs { margin-left: 0; }
   .ind textarea { margin-left: 0; width: 100%; }
 }
 
