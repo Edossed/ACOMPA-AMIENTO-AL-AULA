@@ -41,7 +41,7 @@ window.APP = (function () {
 
   // Retroalimentación automática a partir de los niveles marcados
   function generarRetro(obs) {
-    const fort = [], mejora = [], sug = [];
+    const fort = [], mejora = [];
     window.RUB.indicadores.forEach(i => {
       const n = obs.niveles[i.id];
       const com = (obs.comentarios[i.id] || "").trim();
@@ -51,19 +51,9 @@ window.APP = (function () {
         mejora.push(`• ${i.nombre} (${nivelNombre(n)}): ${i.niveles[n - 1]}${com ? " Evidencia: " + com : ""}`);
       }
     });
-    // Sugerencias solo para los 5 indicadores más descendidos (primero Por desarrollar)
-    window.RUB.indicadores.filter(i => obs.niveles[i.id] === 1).concat(window.RUB.indicadores.filter(i => obs.niveles[i.id] === 2))
-      .slice(0, 5).forEach(i => sug.push(`${i.nombre}:\n  – ${i.sug.slice(0, 2).join("\n  – ")}`));
-    if (!sug.length) {
-      // Todo en nivel 3 o 4: proponer avanzar a Destacado en los indicadores de nivel 3
-      window.RUB.indicadores.filter(i => obs.niveles[i.id] === 3).slice(0, 3).forEach(i => {
-        sug.push(`${i.nombre} (para avanzar a Destacado):\n  – ${i.sug[i.sug.length - 1]}`);
-      });
-    }
     return {
       fortalezas: fort.join("\n") || "• (Sin indicadores en nivel Desarrollado o Destacado)",
-      mejoras: mejora.join("\n") || "• No se registran indicadores en nivel Por desarrollar o En desarrollo.",
-      sugerencias: sug.join("\n")
+      mejoras: mejora.join("\n") || "• No se registran indicadores en nivel Por desarrollar o En desarrollo."
     };
   }
 
@@ -141,10 +131,8 @@ ${tablas}
 
 <div class="nobreak">
 <h2>Retroalimentación</h2>
-<div class="box"><b>Fortalezas observadas</b>${nl(obs.retro.fortalezas)}</div>
+<div class="box"><b>Fortalezas observadas durante la clase</b>${nl(obs.retro.fortalezas)}</div>
 <div class="box"><b>Aspectos a mejorar</b>${nl(obs.retro.mejoras)}</div>
-<div class="box"><b>Sugerencias de acción</b>${nl(obs.retro.sugerencias)}</div>
-${obs.retro.general ? `<div class="box"><b>Comentario general</b>${nl(obs.retro.general)}</div>` : ""}
 <div class="box"><b>Acuerdos y compromisos</b>${nl(obs.retro.acuerdos) || "&nbsp;"}</div>
 <table class="datos"><tr><td class="k">Fecha de retroalimentación</td><td>${obs.retro.fechaRetro ? fechaLarga(obs.retro.fechaRetro) : ""}</td><td class="k">Fecha de seguimiento</td><td>${obs.retro.fechaSeguimiento ? fechaLarga(obs.retro.fechaSeguimiento) : ""}</td></tr></table>
 </div>

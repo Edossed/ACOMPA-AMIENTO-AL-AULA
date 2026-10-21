@@ -5,7 +5,7 @@
 
   const K = { obs: "pauta.obs", actual: "pauta.actual", cola: "pauta.cola", nomina: "pauta.nomina", codigo: "pauta.codigo", observador: "pauta.observador", compacto: "pauta.compacto", equipo: "pauta.equipo" };
   const CAMPOS = ["docente", "coDocente", "curso", "asignatura", "fecha", "horaInicio", "horaFin", "observador", "objetivo", "herramientasIA"];
-  const RETRO = ["fortalezas", "mejoras", "sugerencias", "general", "acuerdos", "fechaRetro", "fechaSeguimiento"];
+  const RETRO = ["fortalezas", "mejoras", "acuerdos", "fechaRetro", "fechaSeguimiento"];
 
   let nomina = [];
   let obs = null;
@@ -187,8 +187,8 @@
   /* ---------- Acciones ---------- */
   function generar() {
     const r = A.generarRetro(obs);
-    const hayTexto = obs.retro.fortalezas || obs.retro.mejoras || obs.retro.sugerencias;
-    if (hayTexto && !confirm("¿Reemplazar el texto actual de fortalezas, aspectos a mejorar y sugerencias?")) return;
+    const hayTexto = obs.retro.fortalezas || obs.retro.mejoras;
+    if (hayTexto && !confirm("¿Reemplazar el texto actual de fortalezas y aspectos a mejorar?")) return;
     Object.assign(obs.retro, r);
     if (!obs.retro.fechaRetro) obs.retro.fechaRetro = hoy();
     RETRO.forEach(c => { $("r_" + c).value = obs.retro[c] || ""; });
